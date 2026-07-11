@@ -10,11 +10,28 @@ ORIGINAL_ACCESS_LOG_SHA256 = (
 )
 
 
-def _load_report() -> dict[str, object]:
+def _reject_duplicate_keys(pairs):
+    seen = {}
+    for key, value in pairs:
+        if key in seen:
+            raise ValueError(f"duplicate JSON key: {key!r}")
+        seen[key] = value
+    return seen
+
+
+def _reject_non_finite_number(token):
+    raise ValueError(f"{token} is not a valid JSON number")
+
+
+def _load_report() -> dict:
     assert REPORT.is_file(), "missing regular file: /app/report.json"
     try:
-        data = json.loads(REPORT.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        data = json.loads(
+            REPORT.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+            parse_constant=_reject_non_finite_number,
+        )
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         raise AssertionError("/app/report.json must contain valid UTF-8 JSON") from exc
     assert isinstance(data, dict), "/app/report.json must contain one JSON object"
     return data
